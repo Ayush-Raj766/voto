@@ -1,0 +1,97 @@
+# =========================
+# Node.js
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Build / Output
+# =========================
+dist/
+build/
+out/
+.next/
+.cache/
+
+# =========================
+# React / Frontend
+# =========================
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+
+# =========================
+# Backend
+# =========================
+backend/node_modules/
+backend/dist/
+backend/build/
+
+# =========================
+# Blockchain / Hardhat
+# =========================
+artifacts/
+cache/
+typechain/
+coverage/
+coverage.json
+
+# Hardhat env & secrets
+secrets.json
+.env.local
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Misc
+# =========================
+*.pem
+*.key
+*.crt
+
+# =========================
+# Testing
+# =========================
+coverage/
+jest-cache/
+
+# =========================
+# Temporary files
+# =========================
+tmp/
+temp/
+*.tmp
+
+# =========================
+# Docker (if used)
+# =========================
+.dockerignore
+docker-compose.override.yml
