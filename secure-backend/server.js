@@ -14,7 +14,9 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:5173",
+  "http://localhost:3000",
   "https://voto-livid.vercel.app",
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : []),
 ];
 
 // ✅ CORS setup (ONLY ONCE)
@@ -24,9 +26,12 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`Blocked by CORS: origin='${origin}'`);
         callback(new Error("Not allowed by CORS"));
       }
     },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     credentials: true,
   })
 );
