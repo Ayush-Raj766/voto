@@ -9,8 +9,19 @@ import { contract } from "../utils/blockchain.js"
 export const getElections = async (req, res, next) => {
   try {
 
+    // ✅ Get organization from logged-in user
+    const organizationName = req.user.organizationName
+
+    if (!organizationName) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization not found for user"
+      })
+    }
+
+    // 🔥 Filter elections by organization
     const elections = await Election
-      .find()
+      .find({ organizationName })
       .sort({ createdAt: -1 })
 
     return res.status(200).json({
@@ -24,14 +35,27 @@ export const getElections = async (req, res, next) => {
 }
 
 
-
 /* ================= GET ACTIVE ELECTIONS ================= */
 
 export const getActiveElections = async (req, res, next) => {
   try {
 
+    // ✅ Get organization from logged-in user
+    const organizationName = req.user.organizationName
+
+    if (!organizationName) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization not found for user"
+      })
+    }
+
+    // 🔥 Filter by BOTH status + organization
     const elections = await Election
-      .find({ status: "active" })
+      .find({
+        status: "active",
+        organizationName
+      })
       .sort({ createdAt: -1 })
 
     return res.status(200).json({
@@ -82,10 +106,20 @@ export const createElection = async (req, res, next) => {
 
     const { title, description, startDate, endDate } = req.body
 
+    // ✅ Get organization from logged-in user
+    const organizationName = req.user.organizationName
+
     if (!title || !startDate || !endDate) {
       return res.status(400).json({
         success: false,
         message: "Title, start date and end date required"
+      })
+    }
+
+    if (!organizationName) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization not found in user"
       })
     }
 
@@ -107,6 +141,7 @@ export const createElection = async (req, res, next) => {
       description,
       startDate,
       endDate,
+      organizationName: organizationName,  // 🔥 IMPORTANT
       blockchainId: Number(electionCount),
       status: "upcoming",
       candidates: [],
@@ -322,8 +357,28 @@ export const getWinner = async (req, res, next) => {
 
   try {
 
+    // ✅ Get user's organization
+    const organizationName = req.user.organizationName
+
+    // 🔍 Find election
     const election = await Election.findById(req.params.id)
 
+    if (!election) {
+      return res.status(404).json({
+        success: false,
+        message: "Election not found"
+      })
+    }
+
+    // 🔒 ORG CHECK (CRITICAL)
+    if (election.organizationName !== organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to view this election result"
+      })
+    }
+
+    // 📦 Blockchain call
     const result = await contract.getWinner(
       election.blockchainId
     )
@@ -331,6 +386,7 @@ export const getWinner = async (req, res, next) => {
     const winnerId = Number(result[0])
     const votes = Number(result[1])
 
+    // 🎯 Find candidate locally
     const candidate = election.candidates.find(
       c => Number(c.id) === winnerId
     )

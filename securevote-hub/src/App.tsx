@@ -9,6 +9,7 @@ import { NetworkWarning } from "@/components/NetworkWarning";
 
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
+import Index from "@/pages/Index";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminElections from "@/pages/admin/AdminElections";
 import AdminCandidates from "@/pages/admin/AdminCandidates";
@@ -36,7 +37,7 @@ const App = () => (
         <NetworkWarning />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/auth/login" replace />} />
+            <Route path="/" element={<Index />} />
             <Route path="/auth/login" element={<LoginPage />} />
             <Route path="/auth/register" element={<RegisterPage />} />
 

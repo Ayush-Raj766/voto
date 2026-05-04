@@ -41,7 +41,7 @@ const candidateSchema = new Schema(
       default: 0,
     },
   },
-  { _id: false } // prevent MongoDB ObjectId
+  { _id: false }, // prevent MongoDB ObjectId
 );
 
 /**
@@ -68,6 +68,13 @@ const electionSchema = new Schema(
     endDate: {
       type: Date,
       required: true,
+    },
+    organizationName: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      index: true, // 🔥 important for filtering
     },
 
     status: {
@@ -97,7 +104,7 @@ const electionSchema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 /**

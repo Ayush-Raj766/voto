@@ -40,6 +40,14 @@ const userSchema = new Schema(
       trim: true,
     },
 
+    organizationName: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      index: true,
+    },
+
     isApproved: {
       type: Boolean,
       default: null,

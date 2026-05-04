@@ -42,6 +42,9 @@ export const loginAPI = (
 export const registerAPI = (data: RegisterData) =>
   API.post("/users/register", data);
 
+export const getOrganizationsAPI = () =>
+  API.get("/users/organizations");
+
 export const logoutAPI = () =>
   API.post("/users/logout");
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/DashboardLayout"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 import {
   Table,
@@ -14,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 import { toast } from "@/hooks/use-toast"
-import { Check, X } from "lucide-react"
+import { Check, X, Search } from "lucide-react"
 import API from "@/services/auth.service"
 
 
@@ -35,6 +36,7 @@ export default function SubadminVoters() {
   const [voters, setVoters] = useState<Voter[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
 
 
@@ -69,7 +71,28 @@ export default function SubadminVoters() {
     fetchVoters()
   }, [])
 
+  /* ---------------- SEARCH VOTERS ---------------- */
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      fetchVoters();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await API.get(`/users/voters/search?wallet=${searchQuery.trim()}`);
+      setVoters(res.data?.voters || []);
+    } catch {
+      toast({
+        title: "Search failed",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /* ---------------- Approve / Reject ---------------- */
 
@@ -173,7 +196,18 @@ export default function SubadminVoters() {
 
       </div>
 
-
+      <form onSubmit={handleSearch} className="mb-6 flex gap-2 max-w-md">
+        <Input 
+          placeholder="Search by wallet address..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-secondary/50"
+        />
+        <Button type="submit" variant="secondary">
+          <Search className="h-4 w-4 mr-2" />
+          Search
+        </Button>
+      </form>
 
       <div className="glass-card overflow-hidden">
 

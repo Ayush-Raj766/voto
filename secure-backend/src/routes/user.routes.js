@@ -11,6 +11,9 @@ import {
     deleteSubadmin,
     getVoterHistory,
     getCurrentUser,
+    getOrganizations,
+    createOrganization,
+    searchVoterByWallet,
 } from "../controllers/user.controllers.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -19,11 +22,14 @@ const router = Router();
 /* ─── Public routes ──────────────────────────────── */
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.get("/organizations", getOrganizations);
 
 /* ─── Auth-required routes ────────────────────────── */
 router.post("/logout", verifyJWT, logoutUser);
+router.post("/organizations", verifyJWT, createOrganization);
 
 // Voter management (admin / subadmin)
+router.get("/voters/search", verifyJWT, searchVoterByWallet);
 router.get("/voters", verifyJWT, getVoters);
 router.post("/:id/approve", verifyJWT, approveVoter);
 

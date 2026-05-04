@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,29 +8,41 @@ import { useWallet } from "@/hooks/useWallet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Wallet, UserPlus, Eye, EyeOff, Shield } from "lucide-react";
 import { motion } from "framer-motion";
-import { ethers } from "ethers"
-import contractABI from "@/abi/Voting.json"
+import { ethers } from "ethers";
+import contractABI from "@/abi/Voting.json";
+import { getOrganizationsAPI } from "@/services/auth.service";
 
-const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
-const registerSchema = z.object({
-  fullName: z.string().min(2, "Name must be at least 2 characters").max(100),
-  email: z.string().email("Invalid email address"),
-  aadhaarId: z.string().regex(/^\d{4}-\d{4}-\d{4}$/, "Format: 1234-5678-9012"),
-  password: z.string().min(8, "Password must be at least 8 characters")
-    .regex(/[A-Z]/, "Must contain uppercase letter")
-    .regex(/[0-9]/, "Must contain a number")
-    .regex(/[^A-Za-z0-9]/, "Must contain a special character"),
-  confirmPassword: z.string(),
-  role: z.enum(["admin", "voter", "subadmin"]),
-}).refine((d) => d.password === d.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const registerSchema = z
+  .object({
+    fullName: z.string().min(2).max(100),
+    email: z.string().email(),
+    aadhaarId: z.string().regex(/^\d{4}-\d{4}-\d{4}$/),
+    password: z
+      .string()
+      .min(8)
+      .regex(/[A-Z]/)
+      .regex(/[0-9]/)
+      .regex(/[^A-Za-z0-9]/),
+    confirmPassword: z.string(),
+    role: z.enum(["admin", "voter", "subadmin"]),
+    organizationName: z.string().min(2, "Select organization"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type FormData = z.infer<typeof registerSchema>;
 
@@ -40,23 +52,41 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [organizations, setOrganizations] = useState<string[]>([]);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
+  useEffect(() => {
+    const fetchOrgs = async () => {
+      try {
+        const res = await getOrganizationsAPI();
+        if (res.data?.success) {
+          setOrganizations(res.data.organizations);
+        }
+      } catch (err) {
+        console.error("Failed to fetch organizations", err);
+      }
+    };
+    fetchOrgs();
+  }, []);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: { role: "voter" },
   });
 
   const onSubmit = async (data: FormData) => {
-
     if (!wallet.address) {
-      toast({ title: "Connect your wallet first", variant: "destructive" })
-      return
+      toast({ title: "Connect your wallet first", variant: "destructive" });
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     try {
-
       // Reliance on AuthContext.register which handles both Blockchain and DB registration
 
       /* -------- Backend registration -------- */
@@ -67,32 +97,28 @@ export default function RegisterPage() {
         password: data.password,
         aadhaarId: data.aadhaarId,
         role: data.role,
-        walletAddress: wallet.address
-      })
+        walletAddress: wallet.address,
+        organizationName: data.organizationName
+      });
 
-      toast({ title: "Registration successful!" })
+      toast({ title: "Registration successful!" });
 
       navigate(
         data.role === "admin"
           ? "/admin"
           : data.role === "subadmin"
             ? "/subadmin"
-            : "/voter"
-      )
-
+            : "/voter",
+      );
     } catch (err: any) {
-
       toast({
         title: err.message || "Registration failed",
-        variant: "destructive"
-      })
-
+        variant: "destructive",
+      });
     } finally {
-
-      setIsSubmitting(false)
-
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -106,31 +132,63 @@ export default function RegisterPage() {
             <Shield className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Join the decentralized voting platform</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Join the decentralized voting platform
+          </p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label>Full Name</Label>
-            <Input {...register("fullName")} placeholder="John Doe" className="mt-1 bg-secondary/50" />
-            {errors.fullName && <p className="mt-1 text-xs text-destructive">{errors.fullName.message}</p>}
+            <Input
+              {...register("fullName")}
+              placeholder="John Doe"
+              className="mt-1 bg-secondary/50"
+            />
+            {errors.fullName && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.fullName.message}
+              </p>
+            )}
           </div>
 
           <div>
             <Label>Email</Label>
-            <Input {...register("email")} type="email" placeholder="john@example.com" className="mt-1 bg-secondary/50" />
-            {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>}
+            <Input
+              {...register("email")}
+              type="email"
+              placeholder="john@example.com"
+              className="mt-1 bg-secondary/50"
+            />
+            {errors.email && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           <div>
             <Label>Aadhaar / National ID</Label>
-            <Input {...register("aadhaarId")} placeholder="1234-5678-9012" className="mt-1 bg-secondary/50" />
-            {errors.aadhaarId && <p className="mt-1 text-xs text-destructive">{errors.aadhaarId.message}</p>}
+            <Input
+              {...register("aadhaarId")}
+              placeholder="1234-5678-9012"
+              className="mt-1 bg-secondary/50"
+            />
+            {errors.aadhaarId && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.aadhaarId.message}
+              </p>
+            )}
           </div>
 
           <div>
             <Label>Role</Label>
-            <Select defaultValue="voter" onValueChange={(v) => setValue("role", v as "admin" | "voter" | "subadmin")}>
+            <Select
+              defaultValue="voter"
+              onValueChange={(v) =>
+                setValue("role", v as "admin" | "voter" | "subadmin")
+              }
+            >
               <SelectTrigger className="mt-1 bg-secondary/50">
                 <SelectValue />
               </SelectTrigger>
@@ -143,20 +201,74 @@ export default function RegisterPage() {
           </div>
 
           <div>
+            <Label>Organization</Label>
+
+            <Select onValueChange={(v) => setValue("organizationName", v)}>
+              <SelectTrigger className="mt-1 bg-secondary/50">
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {organizations.length > 0 ? (
+                  organizations.map((org, i) => (
+                    <SelectItem key={i} value={org} className="capitalize">
+                      {org}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>
+                    No organizations found
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+
+            {errors.organizationName && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.organizationName.message}
+              </p>
+            )}
+          </div>
+
+          <div>
             <Label>Password</Label>
             <div className="relative mt-1">
-              <Input {...register("password")} type={showPw ? "text" : "password"} className="bg-secondary/50 pr-10" />
-              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-2.5 text-muted-foreground">
-                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <Input
+                {...register("password")}
+                type={showPw ? "text" : "password"}
+                className="bg-secondary/50 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3 top-2.5 text-muted-foreground"
+              >
+                {showPw ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
-            {errors.password && <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>}
+            {errors.password && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
           <div>
             <Label>Confirm Password</Label>
-            <Input {...register("confirmPassword")} type="password" className="mt-1 bg-secondary/50" />
-            {errors.confirmPassword && <p className="mt-1 text-xs text-destructive">{errors.confirmPassword.message}</p>}
+            <Input
+              {...register("confirmPassword")}
+              type="password"
+              className="mt-1 bg-secondary/50"
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-xs text-destructive">
+                {errors.confirmPassword.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -164,18 +276,32 @@ export default function RegisterPage() {
             {wallet.isConnected ? (
               <div className="mt-1 flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
                 <Wallet className="h-4 w-4 text-primary" />
-                <span className="truncate font-mono text-xs">{wallet.address}</span>
+                <span className="truncate font-mono text-xs">
+                  {wallet.address}
+                </span>
               </div>
             ) : (
-              <Button type="button" variant="outline" onClick={wallet.connect} disabled={wallet.isConnecting} className="mt-1 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={wallet.connect}
+                disabled={wallet.isConnecting}
+                className="mt-1 w-full"
+              >
                 <Wallet className="mr-2 h-4 w-4" />
                 {wallet.isConnecting ? "Connecting..." : "Connect MetaMask"}
               </Button>
             )}
-            {wallet.error && <p className="mt-1 text-xs text-destructive">{wallet.error}</p>}
+            {wallet.error && (
+              <p className="mt-1 text-xs text-destructive">{wallet.error}</p>
+            )}
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="w-full glow-primary">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full glow-primary"
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             {isSubmitting ? "Creating Account..." : "Register"}
           </Button>
@@ -183,7 +309,12 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link to="/auth/login" className="font-medium text-primary hover:underline">Sign In</Link>
+          <Link
+            to="/auth/login"
+            className="font-medium text-primary hover:underline"
+          >
+            Sign In
+          </Link>
         </p>
       </motion.div>
     </div>
