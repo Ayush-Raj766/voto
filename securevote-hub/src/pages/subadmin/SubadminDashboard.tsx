@@ -8,14 +8,18 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { Link } from "react-router-dom"
 import API from "@/services/auth.service"
+import { useAuth } from "@/context/AuthContext"
+import { Badge } from "@/components/ui/badge"
 
 interface Voter {
-  isApproved: boolean | null
+  isApproved: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 interface VoterCounts {
@@ -25,6 +29,8 @@ interface VoterCounts {
 }
 
 export default function SubadminDashboard() {
+  const { user } = useAuth()
+  const approved = user?.isActiveOnChain === true
 
   const [elections, setElections] = useState<Election[]>([])
   const [voterCounts, setVoterCounts] = useState<VoterCounts>({
@@ -32,6 +38,14 @@ export default function SubadminDashboard() {
     approved: 0,
     rejected: 0
   })
+
+  const capitalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
 
 
   /* ---------------- FETCH DATA ---------------- */
@@ -52,9 +66,9 @@ export default function SubadminDashboard() {
       const voters: Voter[] = res.data?.voters || []
 
       setVoterCounts({
-        pending: voters.filter(v => v.isApproved === null).length,
-        approved: voters.filter(v => v.isApproved === true).length,
-        rejected: voters.filter(v => v.isApproved === false).length
+        pending: voters.filter(v => v.approvalStatus === "pending" || v.isApproved === null).length,
+        approved: voters.filter(v => v.approvalStatus === "approved" || (v.approvalStatus === undefined && v.isApproved === true)).length,
+        rejected: voters.filter(v => v.approvalStatus === "rejected" || (v.approvalStatus === undefined && v.isApproved === false)).length
       })
 
     } catch {
@@ -64,9 +78,11 @@ export default function SubadminDashboard() {
 
 
   useEffect(() => {
-    fetchElections()
-    fetchVoters()
-  }, [])
+    if (approved) {
+      fetchElections()
+      fetchVoters()
+    }
+  }, [approved])
 
 
 
@@ -147,113 +163,125 @@ export default function SubadminDashboard() {
 
     <DashboardLayout role="subadmin">
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Sub-Admin Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">
-          Verify voters and manage candidates
-        </p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Sub-Admin Dashboard</h1>
+          <p className="mt-1 text-muted-foreground">
+            Verify voters and manage candidates
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {user?.isActiveOnChain ? (
+            <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1 text-xs">
+              Sub-Admin Active
+            </Badge>
+          ) : (
+            <Badge className="bg-destructive/20 text-destructive border border-destructive/30 px-3 py-1 text-xs">
+              Sub-Admin Disabled
+            </Badge>
+          )}
+        </div>
       </div>
 
-
-      {/* ---------------- STATS GRID ---------------- */}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-
-        {stats.map((stat, index) => (
-
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.07 }}
-          >
-
-            <div className="glass-card-hover p-5 h-full">
-
-              <div className="flex items-center justify-between">
-
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 text-3xl font-bold">
-                    {stat.value}
-                  </p>
-                </div>
-
-                <div className={`rounded-lg ${stat.bg} p-3`}>
-                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                </div>
-
-              </div>
-
+      {!approved && (
+        <div className="glass-card mb-6 border-l-4 p-5" style={{ borderLeftColor: user?.approvalStatus === "rejected" ? "hsl(var(--destructive))" : "hsl(var(--warning))" }}>
+          <div className="flex items-center gap-3">
+            <div className={`rounded-lg p-2 ${user?.approvalStatus === "rejected" ? "bg-destructive/10" : "bg-warning/10"}`}>
+              {user?.approvalStatus === "rejected" ? (
+                <XCircle className="h-5 w-5 text-destructive" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              )}
             </div>
+            <div>
+              <h4 className="font-semibold">
+                {user?.approvalStatus === "rejected" ? "Access Denied" : "Approval Pending"}
+              </h4>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Hey {capitalize(user?.fullName)}, your account is waiting for Admin approval.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
-          </motion.div>
-
-        ))}
-
-      </div>
-
-
-      {/* ---------------- QUICK ACTIONS ---------------- */}
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-
-        {quickActions.map((action, index) => (
-
-          <motion.div
-            key={action.href}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 + index * 0.1 }}
-          >
-
-            <Link to={action.href}>
-
-              <div className="glass-card-hover group flex items-center justify-between p-5 cursor-pointer">
-
-                <div className="flex items-center gap-4">
-
-                  <div className="rounded-lg bg-primary/10 p-3">
-                    <action.icon className="h-5 w-5 text-primary" />
-                  </div>
-
-                  <div>
-
-                    <div className="flex items-center gap-2">
-
-                      <p className="font-semibold">
-                        {action.title}
+      {approved ? (
+        <>
+          {/* ---------------- STATS GRID ---------------- */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.07 }}
+              >
+                <div className="glass-card-hover p-5 h-full">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        {stat.label}
                       </p>
-
-                      {action.badge && (
-                        <span className="rounded-full bg-yellow-400/20 px-2 py-0.5 text-xs font-medium text-yellow-400">
-                          {action.badge}
-                        </span>
-                      )}
-
+                      <p className="mt-1 text-3xl font-bold">
+                        {stat.value}
+                      </p>
                     </div>
-
-                    <p className="text-sm text-muted-foreground">
-                      {action.description}
-                    </p>
-
+                    <div className={`rounded-lg ${stat.bg} p-3`}>
+                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                    </div>
                   </div>
-
                 </div>
+              </motion.div>
+            ))}
+          </div>
 
-                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
-
-              </div>
-
-            </Link>
-
-          </motion.div>
-
-        ))}
-
-      </div>
+          {/* ---------------- QUICK ACTIONS ---------------- */}
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {quickActions.map((action, index) => (
+              <motion.div
+                key={action.href}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+              >
+                <Link to={action.href}>
+                  <div className="glass-card-hover group flex items-center justify-between p-5 cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-lg bg-primary/10 p-3">
+                        <action.icon className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">
+                            {action.title}
+                          </p>
+                          {action.badge && (
+                            <span className="rounded-full bg-yellow-400/20 px-2 py-0.5 text-xs font-medium text-yellow-400">
+                              {action.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {action.description}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="glass-card p-6 text-center">
+          <Clock className="mx-auto mb-3 h-10 w-10 text-muted-foreground animate-pulse" />
+          <p className="font-medium text-muted-foreground">Management Features Locked</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            You will be able to verify voters and manage candidates once the Admin approves your account.
+          </p>
+        </div>
+      )}
 
     </DashboardLayout>
 

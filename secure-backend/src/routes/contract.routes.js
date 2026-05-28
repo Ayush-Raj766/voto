@@ -12,7 +12,7 @@ import {
   getActiveElections
 } from "../controllers/contract.controllers.js";
 
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { verifyJWT, verifyApprovedVoter, verifyApprovedSubadmin } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -20,41 +20,41 @@ const router = express.Router();
 
 /* -------- Elections -------- */
 
-router.get("/", verifyJWT, getElections);
-router.get("/voter", verifyJWT, getActiveElections);   
-router.get("/:id", verifyJWT, getElection);
+router.get("/", verifyJWT, verifyApprovedVoter, getElections);
+router.get("/voter", verifyJWT, verifyApprovedVoter, getActiveElections);   
+router.get("/:id", verifyJWT, verifyApprovedVoter, getElection);
 
 
 
 /* -------- Create -------- */
 
-router.post("/", verifyJWT, createElection);
+router.post("/", verifyJWT, verifyApprovedSubadmin, createElection);
 
 
 
 /* -------- Candidates -------- */
 
-router.post("/:id/candidates", verifyJWT, addCandidate);
+router.post("/:id/candidates", verifyJWT, verifyApprovedSubadmin, addCandidate);
 
 
 
 /* -------- Voting -------- */
 
-router.post("/:id/vote", verifyJWT, vote);
-router.get("/:id/has-voted/:wallet", verifyJWT, hasVoted);
+router.post("/:id/vote", verifyJWT, verifyApprovedVoter, vote);
+router.get("/:id/has-voted/:wallet", verifyJWT, verifyApprovedVoter, hasVoted);
 
 
 
 /* -------- Election Control -------- */
 
-router.post("/:id/start", verifyJWT, startElection);
-router.post("/:id/end", verifyJWT, endElection);
+router.post("/:id/start", verifyJWT, verifyApprovedSubadmin, startElection);
+router.post("/:id/end", verifyJWT, verifyApprovedSubadmin, endElection);
 
 
 
 /* -------- Result -------- */
 
-router.get("/:id/winner", verifyJWT, getWinner);
+router.get("/:id/winner", verifyJWT, verifyApprovedVoter, getWinner);
 
 
 

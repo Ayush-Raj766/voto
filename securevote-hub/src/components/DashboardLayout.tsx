@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, Vote, Users, Trophy, PlusCircle, History, BarChart3,
-  LogOut, ChevronLeft, ChevronRight, Shield, UserCheck, Eye
+  LogOut, ChevronLeft, ChevronRight, Shield, UserCheck, Eye, Building
 } from "lucide-react";
 import { useState } from "react";
 
@@ -17,6 +17,7 @@ interface NavItem {
 
 const adminNav: NavItem[] = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+  { label: "Organizations", to: "/admin/organizations", icon: Building },
   { label: "Elections", to: "/admin/elections", icon: Vote },
   { label: "Candidates", to: "/admin/candidates", icon: Users },
   { label: "Voters", to: "/admin/voters", icon: Users },
@@ -27,6 +28,7 @@ const adminNav: NavItem[] = [
 
 const subadminNav: NavItem[] = [
   { label: "Dashboard", to: "/subadmin", icon: LayoutDashboard },
+  { label: "Elections", to: "/subadmin/elections", icon: Vote },
   { label: "Candidates", to: "/subadmin/candidates", icon: Users },
   { label: "Voters", to: "/subadmin/voters", icon: UserCheck },
   { label: "Transparency", to: "/transparency", icon: Eye },
@@ -45,7 +47,17 @@ export function DashboardLayout({ children, role }: { children: React.ReactNode;
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const items = role === "admin" ? adminNav : role === "subadmin" ? subadminNav : voterNav;
+
+  const rawItems = role === "admin" ? adminNav : role === "subadmin" ? subadminNav : voterNav;
+  const items = rawItems.filter((item) => {
+    if (user?.role === "voter" && user?.isVerifiedOnChain !== true) {
+      return item.to === "/voter" || item.to === "/transparency";
+    }
+    if (user?.role === "subadmin" && user?.isActiveOnChain !== true) {
+      return item.to === "/subadmin" || item.to === "/transparency";
+    }
+    return true;
+  });
 
   const handleLogout = () => {
     logout();

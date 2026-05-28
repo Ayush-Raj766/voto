@@ -2,39 +2,34 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { contractService, Election } from "@/services/contractService";
 import { useWallet } from "@/hooks/useWallet";
+import { useAuth } from "@/context/AuthContext";
 import API from "@/services/auth.service";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
-import { Vote, CheckCircle, Loader2, AlertTriangle } from "lucide-react";
+import { Vote, CheckCircle, Loader2, AlertTriangle, XCircle } from "lucide-react";
 
 export default function VoterElections() {
   const wallet = useWallet();
+
+  const { user, refreshUser } = useAuth();
 
   const [elections, setElections] = useState<Election[]>([]);
   const [votedElections, setVotedElections] = useState<Set<string>>(new Set());
   const [votingElection, setVotingElection] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [approved, setApproved] = useState<boolean | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
-  /* ---------------- Check voter approval ---------------- */
+  const approved = user?.isApproved === true;
 
-const checkApproval = async () => {
-  try {
-    const { data } = await API.get("/users/me");
-
-    setApproved(Boolean(data?.user?.isApproved));
-  } catch {
-    setApproved(false);
-
-    toast({
-      title: "Unable to verify voter",
-      variant: "destructive",
-    });
-  }
-};
+  const capitalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
 
   /* ---------------- Load elections ---------------- */
 
@@ -60,9 +55,9 @@ const checkApproval = async () => {
     const init = async () => {
       setLoading(true);
 
-      await checkApproval();
+      await refreshUser();
 
-      if (wallet.isConnected) {
+      if (wallet.isConnected && user?.isApproved) {
         await loadElections();
       }
 
@@ -70,7 +65,7 @@ const checkApproval = async () => {
     };
 
     init();
-  }, [wallet.isConnected]);
+  }, [wallet.isConnected, user?.isApproved]);
 
   /* ---------------- Check voting status ---------------- */
 
@@ -188,13 +183,19 @@ const checkApproval = async () => {
       )}
 
       {approved === false && (
-        <div className="glass-card p-6 text-center">
-          <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-yellow-400" />
+        <div className="glass-card p-6 text-center border-l-4" style={{ borderLeftColor: user?.approvalStatus === "rejected" ? "hsl(var(--destructive))" : "hsl(var(--warning))" }}>
+          {user?.approvalStatus === "rejected" ? (
+            <XCircle className="mx-auto mb-3 h-10 w-10 text-destructive" />
+          ) : (
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-yellow-400" />
+          )}
 
-          <p className="font-medium">Your account is waiting for approval</p>
+          <p className="font-medium">
+            {user?.approvalStatus === "rejected" ? "Approval Rejected" : "Approval Pending"}
+          </p>
 
-          <p className="text-sm text-muted-foreground">
-            A subadmin must verify your registration
+          <p className="text-sm text-muted-foreground mt-2">
+            Hey {capitalize(user?.fullName)}, you are not approved for voting yet. Please wait for Admin or Sub-Admin approval.
           </p>
         </div>
       )}

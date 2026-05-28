@@ -42,3 +42,25 @@ export const contract = new ethers.Contract(
   abi.abi,
   wallet
 );
+
+export const isVoterVerifiedOnChain = async (walletAddress) => {
+  try {
+    if (!walletAddress) return false;
+    const voter = await contract.voters(walletAddress.toLowerCase());
+    return voter.verified;
+  } catch (error) {
+    console.error("Error checking voter verification on chain:", error);
+    return false;
+  }
+};
+
+export const isSubAdminActiveOnChain = async (walletAddress) => {
+  try {
+    if (!walletAddress) return false;
+    const subAdmin = await contract.subAdmins(walletAddress.toLowerCase());
+    return subAdmin.isActive;
+  } catch (error) {
+    console.error("Error checking subadmin active status on chain:", error);
+    return false;
+  }
+};

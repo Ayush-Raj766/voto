@@ -26,7 +26,9 @@ interface Voter {
   email: string
   walletAddress: string
   aadhaarId: string
-  isApproved: boolean | null
+  isApproved: boolean
+  approvalStatus: "pending" | "approved" | "rejected"
+  isVerifiedOnChain?: boolean
 }
 
 
@@ -118,7 +120,7 @@ export default function SubadminVoters() {
       setVoters(prev =>
         prev.map(v =>
           v._id === voterId
-            ? { ...v, isApproved: approved }
+            ? { ...v, isApproved: approved, approvalStatus: approved ? "approved" : "rejected" }
             : v
         )
       )
@@ -152,16 +154,15 @@ export default function SubadminVoters() {
 
 
 
-  const renderStatus = (status: boolean | null) => {
-
-    if (status === true)
+  const renderStatus = (status: "pending" | "approved" | "rejected" | string) => {
+    if (status === "approved")
       return (
         <Badge className="bg-green-500/20 text-green-400">
           Approved
         </Badge>
       )
 
-    if (status === false)
+    if (status === "rejected")
       return (
         <Badge variant="destructive">
           Rejected
@@ -169,11 +170,10 @@ export default function SubadminVoters() {
       )
 
     return (
-      <Badge variant="secondary">
-        Pending
+      <Badge className="bg-yellow-500/20 text-yellow-400">
+        Pending Approval
       </Badge>
     )
-
   }
 
 
@@ -220,7 +220,8 @@ export default function SubadminVoters() {
               <TableHead>Email</TableHead>
               <TableHead>Aadhaar ID</TableHead>
               <TableHead>Wallet</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Approval</TableHead>
+              <TableHead>Blockchain</TableHead>
               <TableHead className="text-right">
                 Actions
               </TableHead>
@@ -239,7 +240,7 @@ export default function SubadminVoters() {
               <TableRow>
 
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-8 text-center text-muted-foreground"
                 >
                   Loading voters...
@@ -274,46 +275,56 @@ export default function SubadminVoters() {
                 </TableCell>
 
                 <TableCell>
-                  {renderStatus(voter.isApproved)}
+                  {renderStatus(voter.approvalStatus)}
+                </TableCell>
+
+                <TableCell>
+                  {voter.isVerifiedOnChain ? (
+                    <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 whitespace-nowrap">
+                      Verified on Blockchain
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 whitespace-nowrap">
+                      Pending Approval
+                    </Badge>
+                  )}
                 </TableCell>
 
 
 
                 <TableCell className="text-right">
 
-                  {voter.isApproved === null && (
-
                     <div className="flex justify-end gap-2">
+                      {voter.approvalStatus !== "approved" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={processingId === voter._id}
+                          onClick={() =>
+                            updateVoterStatus(voter._id, true)
+                          }
+                          className="h-7 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                          title="Approve Voter"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      )}
 
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={processingId === voter._id}
-                        onClick={() =>
-                          updateVoterStatus(voter._id, true)
-                        }
-                        className="h-7 border-green-500/30 text-green-400 hover:bg-green-500/10"
-                      >
-                        <Check className="h-3 w-3" />
-                      </Button>
-
-
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={processingId === voter._id}
-                        onClick={() =>
-                          updateVoterStatus(voter._id, false)
-                        }
-                        className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-
+                      {voter.approvalStatus !== "rejected" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={processingId === voter._id}
+                          onClick={() =>
+                            updateVoterStatus(voter._id, false)
+                          }
+                          className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
+                          title="Reject Voter"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
-
-                  )}
 
                 </TableCell>
 
@@ -330,7 +341,7 @@ export default function SubadminVoters() {
               <TableRow>
 
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-8 text-center text-muted-foreground"
                 >
                   No registered voters found

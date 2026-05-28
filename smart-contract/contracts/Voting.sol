@@ -117,14 +117,22 @@ contract BlockVote {
             wallet: _wallet,
             fullName: _name,
             email: _email,
-            isActive: true
+            isActive: false
         });
 
         emit SubAdminAdded(_wallet, _name);
     }
 
-    function removeSubAdmin(address _wallet) public onlyAdmin {
+    function enableSubAdmin(address _wallet) public onlyAdmin {
+        subAdmins[_wallet].isActive = true;
+    }
+
+    function disableSubAdmin(address _wallet) public onlyAdmin {
         subAdmins[_wallet].isActive = false;
+    }
+
+    function deleteSubAdmin(address _wallet) public onlyAdmin {
+        delete subAdmins[_wallet];
         emit SubAdminRemoved(_wallet);
     }
 
@@ -167,7 +175,7 @@ contract BlockVote {
         string memory _description,
         uint _startDate,
         uint _endDate
-    ) public onlyAdmin {
+    ) public onlyAdminOrSubAdmin  {
 
         require(_endDate > _startDate, "Invalid dates");
 

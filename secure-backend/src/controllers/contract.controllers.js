@@ -1,6 +1,6 @@
 import { Election } from "../models/election.model.js"
 import { User } from "../models/user.model.js"
-import { contract } from "../utils/blockchain.js"
+import { contract, isVoterVerifiedOnChain } from "../utils/blockchain.js"
 
 
 
@@ -8,29 +8,31 @@ import { contract } from "../utils/blockchain.js"
 
 export const getElections = async (req, res, next) => {
   try {
+    let query = {};
 
-    // ✅ Get organization from logged-in user
-    const organizationName = req.user.organizationName
+    if (req.user.role !== "admin") {
+      const organizationName = req.user.organizationName;
 
-    if (!organizationName) {
-      return res.status(400).json({
-        success: false,
-        message: "Organization not found for user"
-      })
+      if (!organizationName) {
+        return res.status(400).json({
+          success: false,
+          message: "Organization not found for user"
+        });
+      }
+      query.organizationName = organizationName;
     }
 
-    // 🔥 Filter elections by organization
     const elections = await Election
-      .find({ organizationName })
-      .sort({ createdAt: -1 })
+      .find(query)
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
       data: elections
-    })
+    });
 
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
 
@@ -39,32 +41,31 @@ export const getElections = async (req, res, next) => {
 
 export const getActiveElections = async (req, res, next) => {
   try {
+    let query = { status: "active" };
 
-    // ✅ Get organization from logged-in user
-    const organizationName = req.user.organizationName
+    if (req.user.role !== "admin") {
+      const organizationName = req.user.organizationName;
 
-    if (!organizationName) {
-      return res.status(400).json({
-        success: false,
-        message: "Organization not found for user"
-      })
+      if (!organizationName) {
+        return res.status(400).json({
+          success: false,
+          message: "Organization not found for user"
+        });
+      }
+      query.organizationName = organizationName;
     }
 
-    // 🔥 Filter by BOTH status + organization
     const elections = await Election
-      .find({
-        status: "active",
-        organizationName
-      })
-      .sort({ createdAt: -1 })
+      .find(query)
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
       data: elections
-    })
+    });
 
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
 
@@ -82,6 +83,13 @@ export const getElection = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Election not found"
+      })
+    }
+
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
       })
     }
 
@@ -106,8 +114,28 @@ export const createElection = async (req, res, next) => {
 
     const { title, description, startDate, endDate } = req.body
 
-    // ✅ Get organization from logged-in user
-    const organizationName = req.user.organizationName
+    // 🔒 Enforce Role Authorization
+    if (req.user.role !== "admin" && req.user.role !== "subadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: Unauthorized role"
+      })
+    }
+
+    let organizationName;
+
+    if (req.user.role === "subadmin") {
+      organizationName = req.user.organizationName?.toLowerCase().trim()
+    } else if (req.user.role === "admin") {
+      if (req.body.organizationName) {
+        organizationName = req.body.organizationName.toLowerCase().trim()
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Organization name is required for creating an election"
+        })
+      }
+    }
 
     if (!title || !startDate || !endDate) {
       return res.status(400).json({
@@ -184,6 +212,13 @@ export const addCandidate = async (req, res, next) => {
       })
     }
 
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
+      })
+    }
+
     const wallet = walletAddress?.toLowerCase()
 
     /* candidate id comes from blockchain order */
@@ -234,6 +269,13 @@ export const vote = async (req, res, next) => {
       })
     }
 
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
+      })
+    }
+
     if (election.status !== "active") {
       return res.status(400).json({
         success: false,
@@ -243,12 +285,27 @@ export const vote = async (req, res, next) => {
 
     const wallet = walletAddress?.toLowerCase()
 
-    const voter = await User.findOne({ walletAddress: wallet })
-
-    if (!voter || voter.isApproved !== true) {
+    if (wallet !== req.user.walletAddress.toLowerCase()) {
       return res.status(403).json({
         success: false,
-        message: "Voter not verified"
+        message: "Access denied: Wallet address ownership validation failed"
+      })
+    }
+
+    const voter = await User.findOne({ walletAddress: wallet })
+
+    if (!voter) {
+      return res.status(403).json({
+        success: false,
+        message: "Voter not found in database"
+      })
+    }
+
+    const isVerifiedOnChain = await isVoterVerifiedOnChain(wallet)
+    if (!isVerifiedOnChain) {
+      return res.status(403).json({
+        success: false,
+        message: "Voter not verified on blockchain"
       })
     }
 
@@ -294,6 +351,13 @@ export const startElection = async (req, res, next) => {
       })
     }
 
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
+      })
+    }
+
     election.status = "active"
 
     if (req.body.txHash) {
@@ -327,6 +391,13 @@ export const endElection = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Election not found"
+      })
+    }
+
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
       })
     }
 
@@ -371,7 +442,7 @@ export const getWinner = async (req, res, next) => {
     }
 
     // 🔒 ORG CHECK (CRITICAL)
-    if (election.organizationName !== organizationName) {
+    if (req.user.role !== "admin" && election.organizationName !== organizationName) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to view this election result"
@@ -413,6 +484,20 @@ export const hasVoted = async (req, res, next) => {
   try {
 
     const election = await Election.findById(req.params.id)
+
+    if (!election) {
+      return res.status(404).json({
+        success: false,
+        message: "Election not found"
+      })
+    }
+
+    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: This election belongs to another organization"
+      })
+    }
 
     const wallet = req.params.wallet?.toLowerCase()
 

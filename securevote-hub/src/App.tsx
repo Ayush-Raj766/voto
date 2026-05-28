@@ -16,9 +16,11 @@ import AdminCandidates from "@/pages/admin/AdminCandidates";
 import AdminVoters from "@/pages/admin/AdminVoters";
 import AdminSubadmins from "@/pages/admin/AdminSubadmins";
 import AdminResults from "@/pages/admin/AdminResults";
+import AdminOrganizations from "@/pages/admin/AdminOrganizations";
 import SubadminDashboard from "@/pages/subadmin/SubadminDashboard";
 import SubadminVoters from "@/pages/subadmin/SubadminVoters";
 import SubadminCandidates from "@/pages/subadmin/SubadminCandidates";
+import SubadminElections from "@/pages/subadmin/SubadminElections";
 import VoterDashboard from "@/pages/voter/VoterDashboard";
 import VoterElections from "@/pages/voter/VoterElections";
 import VoterHistory from "@/pages/voter/VoterHistory";
@@ -47,10 +49,12 @@ const App = () => (
             <Route path="/admin/candidates" element={<ProtectedRoute role="admin"><AdminCandidates /></ProtectedRoute>} />
             <Route path="/admin/voters" element={<ProtectedRoute role="admin"><AdminVoters /></ProtectedRoute>} />
             <Route path="/admin/subadmins" element={<ProtectedRoute role="admin"><AdminSubadmins /></ProtectedRoute>} />
+            <Route path="/admin/organizations" element={<ProtectedRoute role="admin"><AdminOrganizations /></ProtectedRoute>} />
             <Route path="/admin/results" element={<ProtectedRoute role="admin"><AdminResults /></ProtectedRoute>} />
 
             {/* Sub-admin routes */}
             <Route path="/subadmin" element={<ProtectedRoute role="subadmin"><SubadminDashboard /></ProtectedRoute>} />
+            <Route path="/subadmin/elections" element={<ProtectedRoute role="subadmin"><SubadminElections /></ProtectedRoute>} />
             <Route path="/subadmin/voters" element={<ProtectedRoute role="subadmin"><SubadminVoters /></ProtectedRoute>} />
             <Route path="/subadmin/candidates" element={<ProtectedRoute role="subadmin"><SubadminCandidates /></ProtectedRoute>} />
 

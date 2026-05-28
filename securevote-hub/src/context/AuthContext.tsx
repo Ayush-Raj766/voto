@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { loginAPI, registerAPI, logoutAPI } from "@/services/auth.service";
+import API, { loginAPI, registerAPI, logoutAPI } from "@/services/auth.service";
 import { ethers } from "ethers";
 import contractABI from "@/abi/Voting.json";
 
@@ -13,6 +13,10 @@ export interface User {
   walletAddress: string;
   aadhaarId: string;
   isApproved: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  isActive?: boolean;
+  isVerifiedOnChain?: boolean;
+  isActiveOnChain?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +27,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 export interface RegisterData {
@@ -198,6 +203,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   };
 
+  /* ---------------- REFRESH USER STATUS ---------------- */
+
+  const refreshUser = async () => {
+    try {
+      const res = await API.get("/users/me");
+      const updatedUser = res.data.user;
+      if (updatedUser) {
+        setUser(updatedUser);
+        localStorage.setItem("bv_user", JSON.stringify(updatedUser));
+      }
+    } catch (err) {
+      console.error("Failed to refresh user:", err);
+    }
+  };
+
+  /* ---------------- POLLING EFFECT ---------------- */
+
+  useEffect(() => {
+    if (!token || !user || (user.role !== "voter" && user.role !== "subadmin")) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await API.get("/users/me");
+        const updatedUser = res.data.user;
+        if (updatedUser) {
+          if (
+            updatedUser.isApproved !== user.isApproved ||
+            updatedUser.approvalStatus !== user.approvalStatus ||
+            updatedUser.isActive !== user.isActive ||
+            updatedUser.isVerifiedOnChain !== user.isVerifiedOnChain ||
+            updatedUser.isActiveOnChain !== user.isActiveOnChain
+          ) {
+            setUser(updatedUser);
+            localStorage.setItem("bv_user", JSON.stringify(updatedUser));
+          }
+        }
+      } catch (err) {
+        console.error("Background status poll failed:", err);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [token, user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -207,7 +256,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
-        isAuthenticated: !!user
+        isAuthenticated: !!user,
+        refreshUser
       }}
     >
       {children}

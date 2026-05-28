@@ -14,12 +14,21 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog"
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select"
+
 import { toast } from "@/hooks/use-toast"
 import { PlusCircle, Play, Square, Vote } from "lucide-react"
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { getOrganizationsAPI } from "@/services/auth.service"
 
 
 /* ================================
@@ -30,7 +39,8 @@ const electionSchema = z.object({
   title: z.string().min(3, "Title required"),
   description: z.string().min(3, "Description required"),
   startDate: z.string().min(1, "Start date required"),
-  endDate: z.string().min(1, "End date required")
+  endDate: z.string().min(1, "End date required"),
+  organizationName: z.string().min(2, "Organization is required")
 })
 
 type ElectionForm = z.infer<typeof electionSchema>
@@ -40,6 +50,7 @@ type ElectionForm = z.infer<typeof electionSchema>
 export default function AdminElections() {
 
   const [elections, setElections] = useState<Election[]>([])
+  const [organizations, setOrganizations] = useState<string[]>([])
   const [open, setOpen] = useState(false)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
@@ -48,6 +59,7 @@ export default function AdminElections() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors }
   } = useForm<ElectionForm>({
     resolver: zodResolver(electionSchema)
@@ -85,6 +97,18 @@ export default function AdminElections() {
 
   useEffect(() => {
     loadElections()
+
+    const fetchOrgs = async () => {
+      try {
+        const res = await getOrganizationsAPI()
+        if (res.data?.success && res.data.organizations) {
+          setOrganizations(res.data.organizations)
+        }
+      } catch (err) {
+        console.error("Failed to fetch organizations", err)
+      }
+    }
+    fetchOrgs()
   }, [])
 
 
@@ -110,7 +134,8 @@ export default function AdminElections() {
         title: data.title!,
         description: data.description!,
         startDate: data.startDate!,
-        endDate: data.endDate!
+        endDate: data.endDate!,
+        organizationName: data.organizationName!
       })
 
       toast({
@@ -241,77 +266,106 @@ export default function AdminElections() {
               <DialogTitle>Create Election</DialogTitle>
             </DialogHeader>
 
-
-            <form
-              onSubmit={handleSubmit(onCreate)}
-              className="space-y-4"
-            >
-
-              <div>
-
-                <Label>Title</Label>
-
-                <Input
-                  {...register("title")}
-                  className="mt-1"
-                />
-
-                {errors.title && (
-                  <p className="text-xs text-destructive">
-                    {errors.title.message}
-                  </p>
-                )}
-
-              </div>
-
-
-              <div>
-
-                <Label>Description</Label>
-
-                <Input
-                  {...register("description")}
-                  className="mt-1"
-                />
-
-              </div>
-
-
-              <div>
-
-                <Label>Start Date</Label>
-
-                <Input
-                  type="datetime-local"
-                  {...register("startDate")}
-                  className="mt-1"
-                />
-
-              </div>
-
-
-              <div>
-
-                <Label>End Date</Label>
-
-                <Input
-                  type="datetime-local"
-                  {...register("endDate")}
-                  className="mt-1"
-                />
-
-              </div>
-
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting}
+            {open && (
+              <form
+                onSubmit={handleSubmit(onCreate)}
+                className="space-y-4"
               >
-                {isSubmitting ? "Creating on Blockchain..." : "Create Election"}
-              </Button>
 
-            </form>
+                <div>
+
+                  <Label>Title</Label>
+
+                  <Input
+                    {...register("title")}
+                    className="mt-1"
+                  />
+
+                  {errors.title && (
+                    <p className="text-xs text-destructive">
+                      {errors.title.message}
+                    </p>
+                  )}
+
+                </div>
+
+
+                <div>
+
+                  <Label>Description</Label>
+
+                  <Input
+                    {...register("description")}
+                    className="mt-1"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <Label>Organization</Label>
+
+                  <Select
+                    onValueChange={(value) => setValue("organizationName", value)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations.map((org) => (
+                        <SelectItem key={org} value={org} className="capitalize">
+                          {org}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {errors.organizationName && (
+                    <p className="text-xs text-destructive mt-1">
+                      {errors.organizationName.message}
+                    </p>
+                  )}
+
+                </div>
+
+
+                <div>
+
+                  <Label>Start Date</Label>
+
+                  <Input
+                    type="datetime-local"
+                    {...register("startDate")}
+                    className="mt-1"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <Label>End Date</Label>
+
+                  <Input
+                    type="datetime-local"
+                    {...register("endDate")}
+                    className="mt-1"
+                  />
+
+                </div>
+
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Creating on Blockchain..." : "Create Election"}
+                </Button>
+
+              </form>
+            )}
 
           </DialogContent>
 
@@ -364,7 +418,13 @@ export default function AdminElections() {
                   </h3>
 
 
-                  <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+
+                    {el.organizationName && (
+                      <span className="bg-primary/15 text-primary font-medium px-2 py-0.5 rounded-full capitalize text-[10px]">
+                        {el.organizationName}
+                      </span>
+                    )}
 
                     <span>
                       {el.candidates.length} candidates

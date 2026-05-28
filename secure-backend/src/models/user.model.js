@@ -50,7 +50,13 @@ const userSchema = new Schema(
 
     isApproved: {
       type: Boolean,
-      default: null,
+      default: false,
+    },
+
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
 
     isActive: {

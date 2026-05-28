@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
+import { isVoterVerifiedOnChain, isSubAdminActiveOnChain } from "../utils/blockchain.js";
 
 export const verifyJWT = async (req, res, next) => {
   try {
@@ -41,6 +42,46 @@ export const verifyJWT = async (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: "Invalid or expired token",
+    });
+  }
+};
+
+export const verifyApprovedVoter = async (req, res, next) => {
+  try {
+    if (req.user?.role === "voter") {
+      const isVerified = await isVoterVerifiedOnChain(req.user.walletAddress);
+      if (!isVerified) {
+        return res.status(403).json({
+          success: false,
+          message: `Hey ${req.user.fullName}, you are not approved for voting yet. Please wait for Admin or Sub-Admin approval.`,
+        });
+      }
+    }
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during voter verification",
+    });
+  }
+};
+
+export const verifyApprovedSubadmin = async (req, res, next) => {
+  try {
+    if (req.user?.role === "subadmin") {
+      const isActiveOnChain = await isSubAdminActiveOnChain(req.user.walletAddress);
+      if (!isActiveOnChain) {
+        return res.status(403).json({
+          success: false,
+          message: `Hey ${req.user.fullName}, your account is waiting for Admin approval.`,
+        });
+      }
+    }
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during sub-admin verification",
     });
   }
 };

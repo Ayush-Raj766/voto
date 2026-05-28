@@ -1,96 +1,165 @@
 import { User } from "../models/user.model.js"
-import { contract } from "../utils/blockchain.js"
+import { contract, isVoterVerifiedOnChain, isSubAdminActiveOnChain } from "../utils/blockchain.js"
 import { ethers } from "ethers"
 
 
 
 /* =====================================================
+   CONSTANTS
+===================================================== */
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_WALLET = process.env.ADMIN_WALLET?.toLowerCase();
+
+/* =====================================================
    LOGIN USER
 ===================================================== */
-
 export const loginUser = async (req, res) => {
   try {
-
-    const { email, password, walletAddress } = req.body
+    const { email, password, walletAddress } = req.body;
 
     if (!email || !password || !walletAddress) {
       return res.status(400).json({
         success: false,
-        message: "Email, password and wallet address are required"
-      })
+        message: "All fields are required",
+      });
     }
 
     if (!ethers.isAddress(walletAddress)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid wallet address"
-      })
+        message: "Invalid wallet address",
+      });
     }
 
-    const wallet = walletAddress.toLowerCase()
+    const wallet = walletAddress.toLowerCase();
 
+    /* ================= ADMIN LOGIN ================= */
+    if (email === ADMIN_EMAIL) {
+      if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid admin credentials",
+        });
+      }
+
+      if (wallet !== ADMIN_WALLET) {
+        return res.status(403).json({
+          success: false,
+          message: "Invalid admin wallet",
+        });
+      }
+
+      let admin = await User.findOne({ email: ADMIN_EMAIL });
+
+      if (!admin) {
+        admin = await User.create({
+          fullName: "System Admin",
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          role: "admin",
+          walletAddress: ADMIN_WALLET,
+          isApproved: true,
+          approvalStatus: "approved",
+        });
+      }
+
+      const accessToken = admin.generateAccessToken();
+      const refreshToken = admin.generateRefreshToken();
+
+      admin.refreshToken = refreshToken;
+      await admin.save({ validateBeforeSave: false });
+
+      const adminData = admin.toObject();
+      delete adminData.password;
+      delete adminData.refreshToken;
+
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Admin login successful",
+        data: {
+          user: { ...adminData, onChainApproved: true },
+          accessToken,
+        },
+      });
+    }
+
+    /* ================= NORMAL USER ================= */
     const user = await User.findOne({
-      email,
-      walletAddress: wallet
-    })
+      email: email.toLowerCase(),
+      walletAddress: wallet,
+    });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found or wallet does not match"
-      })
+        message: "User not found or wallet mismatch",
+      });
     }
 
-    const isPasswordValid = await user.isPasswordCorrect(password)
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account deactivated",
+      });
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password);
 
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials"
-      })
+        message: "Invalid credentials",
+      });
     }
 
-    if (user.role === "voter" && user.isApproved !== true) {
-      return res.status(403).json({
-        success: false,
-        message: "Your account is waiting for approval"
-      })
-    }
+    let onChainApproved = false;
 
-    const accessToken = user.generateAccessToken()
-    const refreshToken = user.generateRefreshToken()
+if (user.role === "voter") {
+  onChainApproved = await isVoterVerifiedOnChain(wallet);
+}
 
-    user.refreshToken = refreshToken
-    await user.save({ validateBeforeSave: false })
+if (user.role === "subadmin") {
+  onChainApproved = await isSubAdminActiveOnChain(wallet);
+}
 
-    const userData = user.toObject()
-    delete userData.password
-    delete userData.refreshToken
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    const userData = user.toObject();
+    delete userData.password;
+    delete userData.refreshToken;
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict"
-    })
+      sameSite: "strict",
+    });
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       data: {
-        user: userData,
-        accessToken
-      }
-    })
-
+        user: { ...userData, onChainApproved },
+        accessToken,
+      },
+    });
   } catch (error) {
-
     return res.status(500).json({
       success: false,
-      message: error.message
-    })
-
+      message: error.message,
+    });
   }
-}
+};
 
 
 
@@ -119,6 +188,13 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "All fields including organization name are required"
+      })
+    }
+
+    if (role === "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin accounts cannot be registered dynamically"
       })
     }
     console.log("ether");
@@ -163,7 +239,8 @@ export const registerUser = async (req, res) => {
     }
 
     // ✅ APPROVAL LOGIC
-    const approvalStatus = role === "voter" ? null : true
+    const isApproved = role === "admin"
+    const approvalStatus = role === "admin" ? "approved" : "pending"
 
     // ✅ CREATE USER WITH ORGANIZATION
     const user = await User.create({
@@ -174,7 +251,8 @@ export const registerUser = async (req, res) => {
       password,
       walletAddress: wallet,
       organizationName: org,   // 🔥 SAVE HERE
-      isApproved: approvalStatus
+      isApproved,
+      approvalStatus
     })
 
     // 🔐 TOKENS
@@ -231,6 +309,35 @@ export const getCurrentUser = async (req, res) => {
     delete user.password
     delete user.refreshToken
 
+    // Query on-chain status dynamically
+    if (user.role === "voter") {
+      user.isVerifiedOnChain = await isVoterVerifiedOnChain(user.walletAddress);
+      if (user.isVerifiedOnChain !== user.isApproved) {
+        await User.findByIdAndUpdate(user._id, {
+          isApproved: user.isVerifiedOnChain,
+          approvalStatus: user.isVerifiedOnChain ? "approved" : user.approvalStatus
+        });
+        user.isApproved = user.isVerifiedOnChain;
+        if (user.isVerifiedOnChain) {
+          user.approvalStatus = "approved";
+        }
+      }
+    } else if (user.role === "subadmin") {
+      user.isActiveOnChain = await isSubAdminActiveOnChain(user.walletAddress);
+      if (user.isActiveOnChain !== user.isActive) {
+        await User.findByIdAndUpdate(user._id, {
+          isActive: user.isActiveOnChain,
+          isApproved: user.isActiveOnChain,
+          approvalStatus: user.isActiveOnChain ? "approved" : user.approvalStatus
+        });
+        user.isActive = user.isActiveOnChain;
+        if (user.isActiveOnChain) {
+          user.isApproved = true;
+          user.approvalStatus = "approved";
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
       user
@@ -259,6 +366,13 @@ export const approveVoter = async (req, res) => {
 
     const { approved } = req.body
 
+    if (req.user.role !== "admin" && req.user.role !== "subadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: Only Admin or Sub-Admin can approve/reject voters"
+      });
+    }
+
     const user = await User.findById(req.params.id)
 
     if (!user || user.role !== "voter") {
@@ -268,9 +382,17 @@ export const approveVoter = async (req, res) => {
       })
     }
 
+    if (req.user.role === "subadmin" && user.organizationName !== req.user.organizationName) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: You can only manage voters within your organization"
+      });
+    }
+
     /* ---------- Update DB status ---------- */
 
     user.isApproved = approved
+    user.approvalStatus = approved ? "approved" : "rejected"
     await user.save()
 
 
@@ -337,35 +459,102 @@ export const approveVoter = async (req, res) => {
 }
 
 /* =====================================================
+   APPROVE / REJECT SUB-ADMIN
+===================================================== */
+export const approveSubadmin = async (req, res) => {
+  try {
+    const { approved } = req.body;
+
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied: Only Admin can approve/reject Sub-Admins"
+      });
+    }
+
+    const subadmin = await User.findById(req.params.id);
+
+    if (!subadmin || subadmin.role !== "subadmin") {
+      return res.status(404).json({
+        success: false,
+        message: "Sub-Admin not found"
+      });
+    }
+
+    subadmin.isApproved = approved;
+    subadmin.approvalStatus = approved ? "approved" : "rejected";
+    subadmin.isActive = approved;
+
+    await subadmin.save({ validateBeforeSave: false });
+
+    /* ---------- Blockchain synchronization ---------- */
+    try {
+      const wallet = subadmin.walletAddress.toLowerCase();
+      if (approved) {
+        const tx = await contract.enableSubAdmin(wallet);
+        await tx.wait();
+      } else {
+        const tx = await contract.disableSubAdmin(wallet);
+        await tx.wait();
+      }
+    } catch (error) {
+      console.log("Blockchain toggle subadmin on approval error:", error);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: approved ? "Sub-Admin approved successfully" : "Sub-Admin rejected successfully",
+      data: subadmin
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
+/* =====================================================
    GET ALL VOTERS
 ===================================================== */
 
 export const getVoters = async (req, res) => {
 
   try {
+    const query = { role: "voter" };
 
-    // ✅ Get organization from logged-in user
-    const organizationName = req.user.organizationName
-
-    if (!organizationName) {
-      return res.status(400).json({
-        success: false,
-        message: "Organization not found for user"
-      })
+    if (req.user.role !== "admin") {
+      const organizationName = req.user.organizationName;
+      if (!organizationName) {
+        return res.status(400).json({
+          success: false,
+          message: "Organization not found for user"
+        });
+      }
+      query.organizationName = organizationName;
     }
 
-    // 🔥 Filter voters by role + organization
     const voters = await User
-      .find({
-        role: "voter",
-        organizationName
-      })
+      .find(query)
       .select("-password -refreshToken")
       .sort({ createdAt: -1 })
 
+    // Populate blockchain verification status
+    const votersWithBlockchain = await Promise.all(
+      voters.map(async (v) => {
+        const doc = v.toObject();
+        try {
+          doc.isVerifiedOnChain = await isVoterVerifiedOnChain(v.walletAddress);
+        } catch {
+          doc.isVerifiedOnChain = false;
+        }
+        return doc;
+      })
+    );
+
     return res.status(200).json({
       success: true,
-      voters
+      voters: votersWithBlockchain
     })
 
   } catch (error) {
@@ -378,6 +567,7 @@ export const getVoters = async (req, res) => {
   }
 
 }
+
 
 
 
@@ -434,8 +624,9 @@ export const createSubadmin = async (req, res) => {
       password,
       role: "subadmin",
       organizationName: org,   // 🔥 IMPORTANT
-      isApproved: true,
-      isActive: true
+      isApproved: false,
+      approvalStatus: "pending",
+      isActive: false
     })
 
     /* ---------- Blockchain ---------- */
@@ -485,10 +676,22 @@ export const getSubadmins = async (req, res) => {
       .select("-password -refreshToken")
       .sort({ createdAt: -1 })
 
+    // Populate blockchain active status
+    const subadminsWithBlockchain = await Promise.all(
+      subadmins.map(async (sub) => {
+        const doc = sub.toObject();
+        try {
+          doc.isActiveOnChain = await isSubAdminActiveOnChain(sub.walletAddress);
+        } catch {
+          doc.isActiveOnChain = false;
+        }
+        return doc;
+      })
+    );
 
     return res.status(200).json({
       success: true,
-      subadmins
+      subadmins: subadminsWithBlockchain
     })
 
   } catch (error) {
@@ -561,7 +764,34 @@ export const toggleSubadminActive = async (req, res) => {
 
     }
 
-    user.isActive = !user.isActive
+    if (user.approvalStatus !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Only approved sub-admins can be enabled/disabled"
+      })
+    }
+
+    const newStatus = !user.isActive
+
+    /* ---------- Blockchain Integration ---------- */
+    try {
+      const wallet = user.walletAddress.toLowerCase()
+      if (newStatus) {
+        const tx = await contract.enableSubAdmin(wallet)
+        await tx.wait()
+      } else {
+        const tx = await contract.disableSubAdmin(wallet)
+        await tx.wait()
+      }
+    } catch (error) {
+      console.log("Blockchain toggle subadmin error:", error)
+      return res.status(500).json({
+        success: false,
+        message: "Failed to update subadmin status on blockchain"
+      })
+    }
+
+    user.isActive = newStatus
 
     await user.save({ validateBeforeSave: false })
 
@@ -603,6 +833,19 @@ export const deleteSubadmin = async (req, res) => {
         message: "Subadmin not found"
       })
 
+    }
+
+    /* ---------- Blockchain Integration ---------- */
+    try {
+      const wallet = user.walletAddress.toLowerCase()
+      const tx = await contract.deleteSubAdmin(wallet)
+      await tx.wait()
+    } catch (error) {
+      console.log("Blockchain delete subadmin error:", error)
+      return res.status(500).json({
+        success: false,
+        message: "Failed to delete subadmin on blockchain"
+      })
     }
 
     await User.findByIdAndDelete(req.params.id)
@@ -679,6 +922,13 @@ export const getOrganizations = async (req, res) => {
     const { Organization } = await import("../models/organization.model.js");
     const organizations = await Organization.find({}).sort({ name: 1 });
     
+    if (req.query.detailed === "true") {
+      return res.status(200).json({
+        success: true,
+        organizations
+      });
+    }
+
     // Return an array of names to match the frontend expectations
     const validOrgs = organizations.map(org => org.name);
 

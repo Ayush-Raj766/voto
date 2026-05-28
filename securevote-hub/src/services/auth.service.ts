@@ -42,8 +42,11 @@ export const loginAPI = (
 export const registerAPI = (data: RegisterData) =>
   API.post("/users/register", data);
 
-export const getOrganizationsAPI = () =>
-  API.get("/users/organizations");
+export const getOrganizationsAPI = (detailed?: boolean) =>
+  API.get(`/users/organizations${detailed ? "?detailed=true" : ""}`);
+
+export const createOrganizationAPI = (name: string) =>
+  API.post("/users/organizations", { name });
 
 export const logoutAPI = () =>
   API.post("/users/logout");

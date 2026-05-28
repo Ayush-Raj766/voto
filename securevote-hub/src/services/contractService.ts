@@ -37,6 +37,7 @@ export interface Election {
   candidates: Candidate[]
   totalVotes: number
   blockchainId?: number | null
+  organizationName?: string
 }
 
 
@@ -55,7 +56,8 @@ function normalizeElection(raw: any): Election {
   return {
     ...raw,
     id: String(raw._id ?? raw.id),
-    candidates: (raw.candidates || []).map(normalizeCandidate)
+    candidates: (raw.candidates || []).map(normalizeCandidate),
+    organizationName: raw.organizationName
   }
 }
 
@@ -187,6 +189,7 @@ export const contractService = {
     description: string
     startDate: string
     endDate: string
+    organizationName?: string
   }): Promise<Election> {
 
     // 1. Blockchain transaction via MetaMask

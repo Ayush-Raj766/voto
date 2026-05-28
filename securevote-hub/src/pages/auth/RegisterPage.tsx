@@ -36,7 +36,7 @@ const registerSchema = z
       .regex(/[0-9]/)
       .regex(/[^A-Za-z0-9]/),
     confirmPassword: z.string(),
-    role: z.enum(["admin", "voter", "subadmin"]),
+    role: z.enum(["voter", "subadmin"]),
     organizationName: z.string().min(2, "Select organization"),
   })
   .refine((d) => d.password === d.confirmPassword, {
@@ -58,11 +58,14 @@ export default function RegisterPage() {
     const fetchOrgs = async () => {
       try {
         const res = await getOrganizationsAPI();
-        if (res.data?.success) {
+        if (res.data?.success && res.data.organizations?.length > 0) {
           setOrganizations(res.data.organizations);
+        } else {
+          setOrganizations(["global"]);
         }
       } catch (err) {
         console.error("Failed to fetch organizations", err);
+        setOrganizations(["global"]);
       }
     };
     fetchOrgs();
@@ -194,7 +197,6 @@ export default function RegisterPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="voter">Voter</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="subadmin">Sub-Admin</SelectItem>
               </SelectContent>
             </Select>

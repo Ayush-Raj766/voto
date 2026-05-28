@@ -14,6 +14,10 @@ dotenv.config({
 // ✅ Connect DB
 connectDB()
 
+// ✅ Blockchain Event Listener Sync Service
+import { startSyncService } from "./src/services/syncService.js"
+startSyncService()
+
 // ✅ Allowed origins
 const allowedOrigins = [
   "http://localhost:8080",

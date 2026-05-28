@@ -14,8 +14,9 @@ import {
     getOrganizations,
     createOrganization,
     searchVoterByWallet,
+    approveSubadmin,
 } from "../controllers/user.controllers.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { verifyJWT, verifyApprovedSubadmin } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -29,13 +30,14 @@ router.post("/logout", verifyJWT, logoutUser);
 router.post("/organizations", verifyJWT, createOrganization);
 
 // Voter management (admin / subadmin)
-router.get("/voters/search", verifyJWT, searchVoterByWallet);
-router.get("/voters", verifyJWT, getVoters);
-router.post("/:id/approve", verifyJWT, approveVoter);
+router.get("/voters/search", verifyJWT, verifyApprovedSubadmin, searchVoterByWallet);
+router.get("/voters", verifyJWT, verifyApprovedSubadmin, getVoters);
+router.post("/:id/approve", verifyJWT, verifyApprovedSubadmin, approveVoter);
 
 // Subadmin management (admin only)
 router.get("/subadmins", verifyJWT, getSubadmins);
 router.post("/subadmins", verifyJWT, createSubadmin);
+router.post("/subadmins/:id/approve", verifyJWT, approveSubadmin);
 router.patch("/:id/toggle", verifyJWT, toggleSubadminActive);
 router.delete("/:id", verifyJWT, deleteSubadmin);
 

@@ -27,7 +27,7 @@ import {
 import { toast } from "@/hooks/use-toast"
 import API from "@/services/auth.service"
 
-import { PlusCircle, Trash2, UserCheck } from "lucide-react"
+import { PlusCircle, Trash2, UserCheck, Loader2, Check, X } from "lucide-react"
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -57,6 +57,9 @@ interface SubAdmin {
   aadhaarId: string
   createdAt: string
   isActive: boolean
+  isApproved: boolean
+  approvalStatus: "pending" | "approved" | "rejected"
+  isActiveOnChain?: boolean
 }
 
 
@@ -68,6 +71,7 @@ export default function AdminSubadmins() {
 
   const [loadingPage, setLoadingPage] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
 
 
@@ -172,6 +176,8 @@ export default function AdminSubadmins() {
 
     try {
 
+      setActionLoading(`toggle-${id}`)
+
       const res = await API.patch(`/users/${id}/toggle`)
 
       toast({
@@ -193,9 +199,61 @@ export default function AdminSubadmins() {
         variant: "destructive"
       })
 
+    } finally {
+
+      setActionLoading(null)
+
     }
 
   }
+
+  const handleApproveSubadmin = async (id: string, approved: boolean) => {
+    try {
+      setActionLoading(`approve-${id}`);
+      await API.post(`/users/subadmins/${id}/approve`, { approved });
+      
+      toast({
+        title: approved ? "Sub-Admin approved successfully" : "Sub-Admin rejected successfully"
+      });
+
+      setSubadmins(prev =>
+        prev.map(s =>
+          s._id === id
+            ? { ...s, isApproved: approved, approvalStatus: approved ? "approved" : "rejected", isActive: approved }
+            : s
+        )
+      );
+    } catch (err: any) {
+      toast({
+        title: err?.response?.data?.message || "Failed to update Sub-Admin approval status",
+        variant: "destructive"
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const renderApprovalStatus = (status: string) => {
+    if (status === "approved") {
+      return (
+        <Badge className="bg-green-500/20 text-green-400">
+          Approved
+        </Badge>
+      );
+    }
+    if (status === "rejected") {
+      return (
+        <Badge variant="destructive">
+          Rejected
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-yellow-500/20 text-yellow-400">
+        Pending Approval
+      </Badge>
+    );
+  };
 
 
 
@@ -204,6 +262,8 @@ export default function AdminSubadmins() {
   const removeSubadmin = async (id: string) => {
 
     try {
+
+      setActionLoading(`remove-${id}`)
 
       await API.delete(`/users/${id}`)
 
@@ -221,6 +281,10 @@ export default function AdminSubadmins() {
         title: "Failed to remove sub-admin",
         variant: "destructive"
       })
+
+    } finally {
+
+      setActionLoading(null)
 
     }
 
@@ -368,7 +432,8 @@ export default function AdminSubadmins() {
               <TableHead>Email</TableHead>
               <TableHead>Wallet</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Approval</TableHead>
+              <TableHead>On-Chain</TableHead>
               <TableHead className="text-right">
                 Actions
               </TableHead>
@@ -383,7 +448,7 @@ export default function AdminSubadmins() {
             {loadingPage && (
 
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={7} className="text-center py-8">
                   Loading sub-admins...
                 </TableCell>
               </TableRow>
@@ -413,15 +478,19 @@ export default function AdminSubadmins() {
                 </TableCell>
 
                 <TableCell>
+                  {renderApprovalStatus(sub.approvalStatus || (sub.isApproved ? "approved" : "pending"))}
+                </TableCell>
+
+                <TableCell>
 
                   <Badge
                     className={
-                      sub.isActive
-                        ? "bg-green-500/20 text-green-400"
-                        : "bg-destructive/20 text-destructive"
+                      sub.isActiveOnChain
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-destructive/20 text-destructive border border-destructive/30"
                     }
                   >
-                    {sub.isActive ? "Active" : "Disabled"}
+                    {sub.isActiveOnChain ? "Sub-Admin Active" : "Sub-Admin Disabled"}
                   </Badge>
 
                 </TableCell>
@@ -432,23 +501,60 @@ export default function AdminSubadmins() {
 
                   <div className="flex justify-end gap-2">
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleSubadmin(sub._id)}
-                    >
-                      <UserCheck className="mr-1 h-3 w-3" />
-                      {sub.isActive ? "Disable" : "Enable"}
-                    </Button>
+                    {sub.approvalStatus !== "approved" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApproveSubadmin(sub._id, true)}
+                        disabled={actionLoading !== null}
+                        className="h-7 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                        title="Approve Sub-Admin"
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                    )}
 
+                    {sub.approvalStatus !== "rejected" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApproveSubadmin(sub._id, false)}
+                        disabled={actionLoading !== null}
+                        className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
+                        title="Reject Sub-Admin"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+
+                    {sub.approvalStatus === "approved" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleSubadmin(sub._id)}
+                        disabled={actionLoading !== null}
+                      >
+                        {actionLoading === `toggle-${sub._id}` ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <UserCheck className="mr-1 h-3 w-3" />
+                        )}
+                        {sub.isActive ? "Disable" : "Enable"}
+                      </Button>
+                    )}
 
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => removeSubadmin(sub._id)}
                       className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                      disabled={actionLoading !== null}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      {actionLoading === `remove-${sub._id}` ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
                     </Button>
 
                   </div>

@@ -2,26 +2,75 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { contractService, Election } from "@/services/contractService";
 import { useWallet } from "@/hooks/useWallet";
-import { Vote, Clock, CheckCircle, BarChart3 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Vote, Clock, CheckCircle, BarChart3, AlertTriangle, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
 
 export default function VoterDashboard() {
   const [elections, setElections] = useState<Election[]>([]);
   const wallet = useWallet();
+  const { user } = useAuth();
 
   useEffect(() => {
-    contractService.getElections().then(setElections);
-  }, []);
+    if (user?.isVerifiedOnChain) {
+      contractService.getElections()
+        .then(setElections)
+        .catch((err) => console.log("Failed to fetch elections in dashboard:", err));
+    }
+  }, [user?.isVerifiedOnChain]);
+
+  const capitalize = (str?: string) => {
+    if (!str) return "";
+    return str
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  };
 
   const active = elections.filter((e) => e.status === "active").length;
   const ended = elections.filter((e) => e.status === "ended").length;
 
   return (
     <DashboardLayout role="voter">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Voter Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Your decentralized voting portal</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Voter Dashboard</h1>
+          <p className="mt-1 text-muted-foreground">Your decentralized voting portal</p>
+        </div>
+        <div className="flex gap-2">
+          {user?.isVerifiedOnChain ? (
+            <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1 text-xs">
+              Verified on Blockchain
+            </Badge>
+          ) : (
+            <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-3 py-1 text-xs">
+              Pending Approval
+            </Badge>
+          )}
+        </div>
       </div>
+
+      {/* Approval Status Banner */}
+      {user?.isVerifiedOnChain === false && (
+        <div className="mb-6 glass-card border-l-4 p-5 flex items-start gap-4" style={{ borderLeftColor: user.approvalStatus === "rejected" ? "hsl(var(--destructive))" : "hsl(var(--warning))" }}>
+          {user.approvalStatus === "rejected" ? (
+            <XCircle className="h-6 w-6 text-destructive shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="h-6 w-6 text-yellow-400 shrink-0 mt-0.5" />
+          )}
+          <div>
+            <h3 className="font-semibold text-lg">
+              {user.approvalStatus === "rejected" ? "Approval Rejected" : "Approval Pending"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {user.approvalStatus === "rejected"
+                ? `Hey ${capitalize(user.fullName)}, your request for voting approval has been rejected. Please contact Admin or Sub-Admin.`
+                : `Hey ${capitalize(user.fullName)}, you are not approved for voting yet. Please wait for Admin or Sub-Admin approval.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Wallet status */}
       {!wallet.isConnected && (
