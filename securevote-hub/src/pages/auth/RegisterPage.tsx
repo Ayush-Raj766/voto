@@ -19,6 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import { Wallet, UserPlus, Eye, EyeOff, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { ethers } from "ethers";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import contractABI from "@/abi/Voting.json";
 import { getOrganizationsAPI } from "@/services/auth.service";
 
@@ -124,7 +125,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 relative">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

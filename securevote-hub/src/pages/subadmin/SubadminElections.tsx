@@ -250,27 +250,35 @@ export default function SubadminElections() {
 
                 {/* Sub-admins are authorized to start/end elections */}
                 <div className="flex gap-2">
-                  {el.status === "upcoming" && (
-                    <Button
-                      size="sm"
-                      disabled={loadingId === el.id}
-                      onClick={() => toggleElection(el.id, "start")}
-                    >
-                      <Play className="mr-1 h-3 w-3" />
-                      Start
-                    </Button>
-                  )}
+                  {new Date(el.endDate).getTime() <= Date.now() || el.status === "ended" ? (
+                    <span className="text-xs font-semibold text-destructive bg-destructive/10 px-2.5 py-1 rounded-md">
+                      Election Over
+                    </span>
+                  ) : (
+                    <>
+                      {el.status === "upcoming" && (
+                        <Button
+                          size="sm"
+                          disabled={loadingId === el.id}
+                          onClick={() => toggleElection(el.id, "start")}
+                        >
+                          <Play className="mr-1 h-3 w-3" />
+                          Start
+                        </Button>
+                      )}
 
-                  {el.status === "active" && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={loadingId === el.id}
-                      onClick={() => toggleElection(el.id, "end")}
-                    >
-                      <Square className="mr-1 h-3 w-3" />
-                      End
-                    </Button>
+                      {el.status === "active" && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={loadingId === el.id}
+                          onClick={() => toggleElection(el.id, "end")}
+                        >
+                          <Square className="mr-1 h-3 w-3" />
+                          End
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

@@ -5,9 +5,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, Vote, Users, Trophy, PlusCircle, History, BarChart3,
-  LogOut, ChevronLeft, ChevronRight, Shield, UserCheck, Eye, Building
+  LogOut, ChevronLeft, ChevronRight, Shield, UserCheck, Eye, Building,
+  Sun, Moon
 } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "@/context/ThemeContext";
 
 interface NavItem {
   label: string;
@@ -44,6 +46,7 @@ const voterNav: NavItem[] = [
 
 export function DashboardLayout({ children, role }: { children: React.ReactNode; role: UserRole }) {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -96,6 +99,19 @@ export function DashboardLayout({ children, role }: { children: React.ReactNode;
               </RouterNavLink>
             );
           })}
+
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4 shrink-0 text-amber-500 animate-pulse" />
+            ) : (
+              <Moon className="h-4 w-4 shrink-0 text-indigo-500" />
+            )}
+            {!collapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
+          </button>
         </nav>
 
         <div className="border-t border-sidebar-border p-3">

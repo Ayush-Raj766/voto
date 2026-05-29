@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Shield, Wallet, UserPlus, CheckCircle, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Index() {
   const steps = [
@@ -29,8 +30,29 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background selection:bg-primary/30">
-      <div className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
         
+        {/* Header Navigation */}
+        <header className="flex justify-between items-center mb-12 border-b border-border/20 pb-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+              <Shield className="h-5 w-5 text-primary" />
+            </div>
+            <span className="font-bold tracking-tight text-xl" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              BlockVote
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link to="/auth/login" className="hidden sm:inline-block">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link to="/auth/register" className="hidden sm:inline-block">
+              <Button className="glow-primary">Get Started</Button>
+            </Link>
+          </div>
+        </header>
+
         {/* Hero Section */}
         <div className="text-center max-w-3xl mx-auto mb-20">
           <motion.div
