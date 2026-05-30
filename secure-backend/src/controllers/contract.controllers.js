@@ -351,7 +351,7 @@ export const startElection = async (req, res, next) => {
       })
     }
 
-    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+    if (req.user.role !== "subadmin" && req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
       return res.status(403).json({
         success: false,
         message: "Access denied: This election belongs to another organization"
@@ -394,7 +394,7 @@ export const endElection = async (req, res, next) => {
       })
     }
 
-    if (req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
+    if (req.user.role !== "subadmin" && req.user.role !== "admin" && election.organizationName !== req.user.organizationName) {
       return res.status(403).json({
         success: false,
         message: "Access denied: This election belongs to another organization"

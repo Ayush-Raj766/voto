@@ -230,7 +230,7 @@ contract BlockVote {
 
     function startElection(uint _electionId)
         public
-        onlyAdmin
+        onlyAdminOrSubAdmin
         electionExists(_electionId)
     {
         elections[_electionId].active = true;
@@ -238,7 +238,7 @@ contract BlockVote {
 
     function endElection(uint _electionId)
         public
-        onlyAdmin
+        onlyAdminOrSubAdmin
         electionExists(_electionId)
     {
         elections[_electionId].active = false;
